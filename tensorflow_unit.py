@@ -1,8 +1,8 @@
 # coding=utf8
 #################在PAI平台移除#############################
-from input_traindata import InputTrainData
-from input_jieba_dic import InputJiebaDic
-from input_testdata import InputTestData
+# from input_traindata import InputTrainData
+# from input_jieba_dic import InputJiebaDic
+# from input_testdata import InputTestData
 ##############################################
 
 import jieba
@@ -61,7 +61,7 @@ jieba_module = jieba
 
 
 def jieba_init(module, dic):
-    for word in dic['word']:
+    for word in dic['dic']:
         module.add_word(word)
 
 
@@ -284,15 +284,6 @@ class MPCNN():
         return atten_embed
 
     def per_dim_conv_layer(self, x, w, b, pooling):
-        '''
-
-        :param input: [batch_size, sentence_length, embed_size, 1]
-        :param w: [ws, embedding_size, 1, num_filters]
-        :param b: [num_filters, embedding_size]
-        :param pooling:
-        :return:
-        '''
-        # unpcak the input in the dim of embed_dim
         input_unstack = tf.unstack(x, axis=2)
         w_unstack = tf.unstack(w, axis=1)
         b_unstack = tf.unstack(b, axis=1)
@@ -307,17 +298,12 @@ class MPCNN():
         return pool
 
     def bulit_block_A(self, x):
-        # bulid block A and cal the similarity according to algorithm 1
         out = []
         with tf.name_scope("bulid_block_A"):
             for pooling in self.poolings:
                 pools = []
                 for i, ws in enumerate(self.filter_sizes):
                     with tf.name_scope("conv-pool-%s" % ws):
-                        # print ('==========x==========')
-                        # print (x)
-                        # exit(0)
-
                         conv = tf.nn.conv2d(x, self.W1[i], strides=[1, 1, 1, 1], padding="VALID")
                         conv = slim.batch_norm(inputs=conv, activation_fn=tf.nn.tanh, is_training=self.is_training)
                         pool = pooling(conv, axis=1)
@@ -339,7 +325,6 @@ class MPCNN():
             return out
 
     def similarity_sentence_layer(self):
-        # atten = self.attention() #[batch_size, length, 2*embedding, 1]
         sent1 = self.bulit_block_A(self.input_x1)
         sent2 = self.bulit_block_A(self.input_x2)
         fea_h = []
@@ -379,13 +364,6 @@ class MPCNN():
         with tf.name_scope("full_connect_layer"):
             h1 = tf.nn.tanh(tf.matmul(fea, self.Wh1) + self.bh1)
             h1 = tf.nn.dropout(h1, self.dropout_keep_prob)
-
-            # h2 = tf.nn.tanh(tf.matmul(h1, self.Wh2) + self.bh2)
-            # h2 = tf.nn.dropout(h2, self.dropout_keep_prob)
-            #
-            # h3 = tf.nn.tanh(tf.matmul(h2, self.Wh3) + self.bh3)
-            # h3 = tf.nn.dropout(h3, self.dropout_keep_prob)
-
             h3 = h1
 
             self.scores = tf.matmul(h3, self.Wo) + self.bo
@@ -397,16 +375,9 @@ class MPCNN():
             # self.loss = -tf.reduce_sum(self.input_y * tf.log(self.output))
             self.loss = tf.reduce_sum(tf.square(tf.subtract(self.input_y, self.output))) + reg
 
-            # self.loss = tf.reduce_mean(
-            #     tf.nn.softmax_cross_entropy_with_logits(logits=self.scores, labels=self.input_y))
-            # self.loss = tf.reduce_mean(losses) + self.l2_reg_lambda * self.l2_loss
-
         with tf.name_scope("accuracy"):
             self.input_y_vector = tf.argmax(self.input_y, 1)
             self.output_y_vector = tf.argmax(self.output, 1, name="temp_sim")
-
-            # self.accuracy = tf.reduce_mean(
-            #     tf.cast(tf.equal(tf.argmax(self.input_y, 1), tf.argmax(self.scores, 1)), tf.float32))
             self.accuracy = tf.reduce_mean(
                 tf.cast(tf.equal(tf.argmax(self.input_y, 1), tf.argmax(self.output, 1)), tf.float32))
 
@@ -463,13 +434,17 @@ class MPCNN():
 
 
 def main():
-    input_train_data = InputTrainData('./train_data/atec_nlp_sim_train.csv')
-    input_test_data = InputTestData('./train_data/atec_nlp_sim_test.csv')
-    input_jieba_dic = InputJiebaDic('./train_data/dict.txt')
+    # input_train_data = InputTrainData('./train_data/atec_nlp_sim_train.csv')
+    # input_test_data = InputTestData('./train_data/atec_nlp_sim_test.csv')
+    # input_jieba_dic = InputJiebaDic('./train_data/dict.txt')
 
-    df_train_data = input_train_data.get_train_data()
-    df_test_data = input_test_data.get_test_data()
-    df_jieba_dic = input_jieba_dic.get_jieba_dic()
+    # df_train_data = input_train_data.get_train_data()
+    # df_test_data = input_test_data.get_test_data()
+    # df_jieba_dic = input_jieba_dic.get_jieba_dic()
+
+    df_train_data=df1
+    df_test_data=df2
+    df_jieba_dic=df3
     #########################以上在PAI平台移除#################################################33
     # 创建一个logger
     logger = logging.getLogger('mylogger')
