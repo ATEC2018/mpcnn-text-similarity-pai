@@ -1,9 +1,10 @@
 # coding=utf8
-#################在PAI平台移除#############################
-# from input_traindata import InputTrainData
-# from input_jieba_dic import InputJiebaDic
-# from input_testdata import InputTestData
-##############################################
+PAI_ENABLE=False
+
+if not PAI_ENABLE:
+    from input_traindata import InputTrainData
+    from input_jieba_dic import InputJiebaDic
+    from input_testdata import InputTestData
 
 import jieba
 from gensim.models import word2vec
@@ -38,7 +39,7 @@ BATCH_SIZE = 64
 # 评估周期(单位step)
 EVALUATE_EVERY = 100
 # 模型存档周期
-CHECKPOINT_EVERY = 2000
+CHECKPOINT_EVERY = 20
 # 优化器学习率
 LR = 1e-3
 
@@ -84,6 +85,10 @@ def train_word2vec(train_data):
 
     return model
 
+# 放到类内部会出错
+def tokenizer_word(iterator):
+    for sentence in iterator:
+        yield list(jieba_module.lcut(sentence))
 
 class MyVocabularyProcessor(learn.preprocessing.VocabularyProcessor):
     def __init__(self,
@@ -91,9 +96,9 @@ class MyVocabularyProcessor(learn.preprocessing.VocabularyProcessor):
                  min_frequency=0,
                  vocabulary=None):
 
-        def tokenizer_word(iterator):
-            for sentence in iterator:
-                yield list(jieba_module.lcut(sentence))
+        # def tokenizer_word(iterator):
+        #     for sentence in iterator:
+        #         yield list(jieba_module.lcut(sentence))
 
         tokenizer_fn = tokenizer_word
         self.sup = super(MyVocabularyProcessor, self)
@@ -434,18 +439,19 @@ class MPCNN():
 
 
 def main():
-    # input_train_data = InputTrainData('./train_data/atec_nlp_sim_train.csv')
-    # input_test_data = InputTestData('./train_data/atec_nlp_sim_test.csv')
-    # input_jieba_dic = InputJiebaDic('./train_data/dict.txt')
+    if not PAI_ENABLE:
+        input_train_data = InputTrainData('./train_data/atec_nlp_sim_train.csv')
+        input_test_data = InputTestData('./train_data/atec_nlp_sim_test.csv')
+        input_jieba_dic = InputJiebaDic('./train_data/dict.txt')
 
-    # df_train_data = input_train_data.get_train_data()
-    # df_test_data = input_test_data.get_test_data()
-    # df_jieba_dic = input_jieba_dic.get_jieba_dic()
+        df_train_data = input_train_data.get_train_data()
+        df_test_data = input_test_data.get_test_data()
+        df_jieba_dic = input_jieba_dic.get_jieba_dic()
+    else:
+        df_train_data=df1
+        df_test_data=df2
+        df_jieba_dic=df3
 
-    df_train_data=df1
-    df_test_data=df2
-    df_jieba_dic=df3
-    #########################以上在PAI平台移除#################################################33
     # 创建一个logger
     logger = logging.getLogger('mylogger')
     logger.setLevel(logging.DEBUG)
@@ -513,7 +519,15 @@ def main():
         train_step = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
         timestamp = str(int(time.time()))
-        out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", timestamp))
+
+        if not PAI_ENABLE:
+            out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", timestamp))
+        else:
+            out_dir=model_dir
+
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+
         # print("Writing to {}\n".format(out_dir))
         #
         loss_summary = tf.summary.scalar("loss", setence_model.loss)
@@ -529,14 +543,11 @@ def main():
         dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, sess.graph)
 
 
-        checkpoint_dir = os.path.abspath(os.path.join(out_dir, "checkpoints"))
-        checkpoint_prefix = os.path.join(checkpoint_dir, "model")
-        if not os.path.exists(checkpoint_dir):
-            os.makedirs(checkpoint_dir)
-        saver = tf.train.Saver(tf.global_variables())
+        ckp_path=out_dir+'model'
+        saver = tf.train.Saver()
 
         # Write vocabulary
-        # vocab_processor.save(os.path.join(checkpoint_dir, "vocab"))
+        vocab_processor.save(os.path.join(out_dir, "vocab"))
 
         def train(x1_batch, x2_batch, y_batch):
             feed_dict = {
@@ -554,7 +565,8 @@ def main():
             logger.info(
                 "{}: step {}, loss {:g}, acc {:g}, f1 {:g}".format(time_str, step, batch_loss, accuracy, f1))
             # logger.info('y_out= {}'.format(y_out))
-            train_summary_writer.add_summary(summaries, step)
+            if not PAI_ENABLE:
+                train_summary_writer.add_summary(summaries, step)
 
         def dev_step(x1_batch, x2_batch, y_batch, writer=None):
             """
@@ -599,7 +611,7 @@ def main():
             x1_batch, x2_batch, y_batch = zip(*batch)
             train(x1_batch, x2_batch, y_batch)
             current_step = tf.train.global_step(sess, global_step)
-            if current_step % EVALUATE_EVERY == 0:
+            if (current_step % EVALUATE_EVERY == 0) and (not PAI_ENABLE):
                 total_dev_loss = 0.0
                 total_dev_accuracy = 0.0
 
@@ -617,7 +629,7 @@ def main():
                 # train_summary_writer.add_summary(summaries)
 
             if current_step % CHECKPOINT_EVERY == 0:
-                saver.save(sess, checkpoint_prefix, global_step=current_step)
+                saver.save(sess, ckp_path)
 
         logger.info("Optimization Finished!")
 
